@@ -6,12 +6,21 @@ public static class DatabaseSeeder
 {
     public static void Seed(ApplicationDbContext context)
     {
-        if (!context.Users.Any())
+        var adminUser = context.Users.FirstOrDefault(u => u.Email == "admin@wallet.com");
+        var regularUser = context.Users.FirstOrDefault(u => u.Email == "user@wallet.com");
+
+        if (adminUser != null && adminUser.WalletBalance == 0)
         {
-            context.Users.AddRange(
-                new User { Name = "Admin", Email = "admin@wallet.com", PasswordHash = BCrypt.Net.BCrypt.HashPassword("admin123") },
-                new User { Name = "User", Email = "user@wallet.com", PasswordHash = BCrypt.Net.BCrypt.HashPassword("user123") }
-            );
+            adminUser.WalletBalance = 1000.00m;
+        }
+
+        if (regularUser != null && regularUser.WalletBalance == 0)
+        {
+            regularUser.WalletBalance = 500.00m;
+        }
+
+        if (adminUser != null || regularUser != null)
+        {
             context.SaveChanges();
         }
     }
