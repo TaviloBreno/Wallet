@@ -1,6 +1,9 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Wallet.DTOs;
 using Wallet.Models;
+using Wallet.Services;
+using System.Linq;
+using Wallet.Interfaces;
 
 namespace Wallet.Controllers
 {
@@ -9,10 +12,12 @@ namespace Wallet.Controllers
     public class AuthController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
+        private readonly ITokenService _tokenService;
 
-        public AuthController(ApplicationDbContext context)
+        public AuthController(ApplicationDbContext context, ITokenService tokenService)
         {
             _context = context;
+            _tokenService = tokenService;
         }
 
         [HttpPost("register")]
@@ -34,6 +39,20 @@ namespace Wallet.Controllers
             _context.SaveChanges();
 
             return Ok("Usuário registrado com sucesso!");
+        }
+
+        [HttpPost("login")]
+        public IActionResult Login(LoginUserDto dto)
+        {
+            var user = _context.Users.FirstOrDefault(u => u.Email == dto.Email);
+            if (user == null || !BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
+            {
+                return Unauthorized("Invalid email or password.");
+            }
+
+            var token = _tokenService.GenerateToken(user);
+
+            return Ok(new { Token = token });
         }
     }
 
