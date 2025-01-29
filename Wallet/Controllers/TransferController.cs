@@ -19,17 +19,22 @@ namespace Wallet.Controllers
         }
 
         /// <summary>
-        /// Criar uma transferência entre usuários (carteiras).
+        /// Criar uma transferência entre usuários.
         /// </summary>
+        [Authorize]
         [HttpPost("create")]
         public IActionResult CreateTransfer([FromBody] TransferDto dto)
         {
-            var senderIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (senderIdClaim == null)
+            var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userIdClaim))
             {
-                return Unauthorized("User is not authorized.");
+                return Unauthorized("User ID is missing from the token.");
             }
-            var senderId = int.Parse(senderIdClaim);
+
+            if (!int.TryParse(userIdClaim, out int senderId))
+            {
+                return Unauthorized("Invalid user ID format.");
+            }
 
             if (dto.Amount <= 0)
             {
@@ -68,6 +73,7 @@ namespace Wallet.Controllers
             return Ok(new { Message = "Transfer completed successfully.", NewBalance = sender.WalletBalance });
         }
 
+
         /// <summary>
         /// Listar transferências realizadas por um usuário, com filtro opcional por período de data.
         /// </summary>
@@ -75,11 +81,15 @@ namespace Wallet.Controllers
         public IActionResult GetTransferHistory([FromQuery] TransferFilterDto filter)
         {
             var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (userIdClaim == null)
+            if (string.IsNullOrEmpty(userIdClaim))
             {
-                return Unauthorized("User is not authorized.");
+                return Unauthorized("User ID is missing from the token.");
             }
-            var userId = int.Parse(userIdClaim);
+
+            if (!int.TryParse(userIdClaim, out int userId))
+            {
+                return Unauthorized("Invalid user ID format.");
+            }
 
             var transfers = _context.Transfers
                 .Where(t => t.SenderId == userId)
@@ -96,12 +106,11 @@ namespace Wallet.Controllers
                 transfers = transfers.Where(t => t.TransferDate <= filter.EndDate.Value).ToList();
             }
 
-            var transferHistory = transfers.Select(t => new
+            var transferHistory = transfers.Select(t => new TransferResponseDto
             {
-                t.Id,
-                t.Amount,
-                t.TransferDate,
-                Receiver = _context.Users.FirstOrDefault(u => u.Id == t.ReceiverId)?.Name ?? "Unknown"
+                Amount = t.Amount,
+                TransferDate = t.TransferDate,
+                ReceiverWallet = _context.Users.FirstOrDefault(u => u.Id == t.ReceiverId)?.Name ?? "Unknown"
             });
 
             return Ok(transferHistory);
